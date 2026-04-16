@@ -1249,4 +1249,4 @@ if submitted:
         st.json(verification)
 
     st.markdown('<div class="footer-note">This tool provides general wellness guidance only and is not medical advice.</div>', unsafe_allow_html=True)
-    )
+    
