@@ -4,7 +4,88 @@ import random
 from dataclasses import dataclass
 
 import streamlit as st
-from google import genai
+# -------------------------------------------------
+# Gemini integration
+# -------------------------------------------------
+def get_gemini_client():
+    api_key = None
+
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        return None
+
+    try:
+        from google import genai
+    except ImportError:
+        return "IMPORT_ERROR"
+
+    try:
+        return genai.Client(api_key=api_key)
+    except Exception:
+        return None
+
+
+def build_gemini_prompt(profile, analysis, verification):
+    workout_text = ""
+    for day, exercises in analysis["detailed_workout"].items():
+        workout_text += f"{day}\n"
+        for ex in exercises:
+            workout_text += f"- {ex}\n"
+        workout_text += "\n"
+
+    return f"""
+You are improving a fitness app output.
+
+Rewrite this plan so it sounds natural, human, and realistic.
+Keep it simple and clear.
+Do not change calories, protein, or exercises.
+If injuries exist, add a small safety note.
+End with one short motivating sentence.
+
+User:
+Name: {profile.name if profile.name.strip() else "User"}
+Goal: {profile.goal}
+Experience: {profile.experience_level}
+Equipment: {profile.equipment}
+Injuries: {profile.injuries if profile.injuries.strip() else "None"}
+
+Plan:
+Calories: {analysis["target_calories"]}
+Protein: {analysis["protein_low"]} to {analysis["protein_high"]} grams
+Cardio: {analysis["cardio_plan"]}
+Nutrition: {analysis["nutrition_guidance"]}
+
+Workout Plan:
+{workout_text}
+
+Summary:
+{verification["final_summary"]}
+""".strip()
+
+
+def generate_gemini_summary(profile, analysis, verification):
+    client = get_gemini_client()
+
+    if client is None:
+        return None
+
+    if client == "IMPORT_ERROR":
+        return "Gemini is enabled in the code, but Streamlit Cloud could not import the Google Gen AI package."
+
+    prompt = build_gemini_prompt(profile, analysis, verification)
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        return f"Gemini error: {e}"
 
 
 # -------------------------------------------------
