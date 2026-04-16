@@ -1,6 +1,7 @@
 import streamlit as st
 from dataclasses import dataclass
 import random
+import math
 
 # -------------------------------------------------
 # Page setup
@@ -12,146 +13,143 @@ st.set_page_config(
 )
 
 # -------------------------------------------------
-# Custom UI styling
+# Clean CSS
 # -------------------------------------------------
 st.markdown("""
 <style>
     .stApp {
-        background-color: #f8fbff;
-        color: #111827;
+        background: #f8fbff;
     }
 
     .block-container {
-        max-width: 1200px;
-        padding-top: 1.5rem;
+        max-width: 1180px;
+        padding-top: 1.25rem;
         padding-bottom: 2rem;
     }
 
-    h1, h2, h3, h4, h5, h6, p, label {
+    h1, h2, h3, h4, h5, h6, p, span, label {
         color: #111827 !important;
     }
 
     .hero-box {
         background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #60a5fa 100%);
-        padding: 2rem;
-        border-radius: 24px;
-        color: white;
-        margin-bottom: 1.25rem;
-        box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+        padding: 1.8rem 2rem;
+        border-radius: 22px;
+        margin-bottom: 1rem;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
     }
 
     .hero-title {
-        font-size: 2.2rem;
-        font-weight: 800;
         color: white !important;
-        margin-bottom: 0.4rem;
+        font-size: 2.1rem;
+        font-weight: 800;
+        margin-bottom: 0.35rem;
     }
 
     .hero-sub {
+        color: #eaf2ff !important;
         font-size: 1rem;
-        line-height: 1.6;
-        color: #e5efff !important;
+        line-height: 1.55;
     }
 
     .hero-joke {
-        margin-top: 0.9rem;
-        font-size: 0.95rem;
         color: #dbeafe !important;
+        font-size: 0.93rem;
         font-style: italic;
+        margin-top: 0.7rem;
     }
 
     .section-card {
         background: white;
         border: 1px solid #dbeafe;
-        border-left: 6px solid #2563eb;
-        border-radius: 20px;
-        padding: 1.2rem 1.2rem;
+        border-left: 5px solid #2563eb;
+        border-radius: 18px;
+        padding: 1rem 1rem 0.85rem 1rem;
         margin-bottom: 1rem;
-        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08);
+        box-shadow: 0 5px 16px rgba(37, 99, 235, 0.07);
     }
 
-    .soft-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 18px;
-        padding: 1rem;
-        margin-bottom: 0.85rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    .result-intro {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 14px;
+        padding: 0.9rem 1rem;
+        font-weight: 600;
+        color: #1e3a8a !important;
+        margin-bottom: 1rem;
     }
 
     .pill {
         display: inline-block;
         background: #eff6ff;
-        color: #1d4ed8 !important;
         border: 1px solid #bfdbfe;
+        color: #1d4ed8 !important;
         border-radius: 999px;
-        padding: 0.38rem 0.78rem;
-        font-size: 0.88rem;
+        padding: 0.35rem 0.75rem;
+        font-size: 0.86rem;
         font-weight: 600;
-        margin-right: 0.45rem;
+        margin-right: 0.4rem;
         margin-bottom: 0.45rem;
     }
 
     .workout-day {
         background: #f8fbff;
         border: 1px solid #dbeafe;
-        border-radius: 18px;
-        padding: 1rem;
-        margin-bottom: 1rem;
+        border-radius: 16px;
+        padding: 0.95rem;
+        margin-bottom: 0.9rem;
     }
 
     .workout-day-title {
-        font-size: 1.08rem;
-        font-weight: 800;
         color: #1d4ed8 !important;
-        margin-bottom: 0.75rem;
+        font-weight: 800;
+        font-size: 1.04rem;
+        margin-bottom: 0.7rem;
     }
 
     .exercise-item {
         background: white;
         border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 0.7rem 0.9rem;
-        margin-bottom: 0.5rem;
+        border-radius: 11px;
+        padding: 0.65rem 0.8rem;
+        margin-bottom: 0.45rem;
         color: #111827 !important;
     }
 
     .summary-box {
         background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
-        color: white;
-        border-radius: 20px;
-        padding: 1.2rem;
+        border-radius: 18px;
+        padding: 1.05rem 1.15rem;
         margin-top: 0.75rem;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
     }
 
     .summary-box * {
         color: white !important;
     }
 
-    .footer-note {
-        text-align: center;
-        color: #4b5563 !important;
-        font-size: 0.92rem;
-        margin-top: 1.25rem;
+    .sidebar-box {
+        background: white;
+        border: 1px solid #dbeafe;
+        border-radius: 16px;
+        padding: 0.9rem;
+        margin-bottom: 0.8rem;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);
     }
 
-    .result-intro {
-        background: #eff6ff;
-        border: 1px solid #bfdbfe;
-        color: #1e3a8a !important;
-        padding: 0.9rem 1rem;
-        border-radius: 16px;
-        font-weight: 600;
-        margin-bottom: 1rem;
+    .footer-note {
+        text-align: center;
+        font-size: 0.9rem;
+        color: #4b5563 !important;
+        margin-top: 1rem;
     }
 
     div[data-testid="stMetric"] {
         background: white;
         border: 1px solid #dbeafe;
-        border-radius: 18px;
-        padding: 0.9rem;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.07);
+        border-radius: 16px;
+        padding: 0.85rem;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);
     }
 
     div[data-testid="stMetricLabel"] {
@@ -165,99 +163,113 @@ st.markdown("""
     }
 
     .stButton > button, .stFormSubmitButton > button {
-        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+        background: linear-gradient(135deg, #1d4ed8, #3b82f6);
         color: white;
-        font-weight: 700;
         border: none;
         border-radius: 14px;
-        padding: 0.75rem 1.2rem;
-        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.18);
+        padding: 0.72rem 1.2rem;
+        font-weight: 700;
+        box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
     }
 
-    .stTextInput input, .stNumberInput input, textarea {
+    .stTextInput input, .stNumberInput input, .stTextArea textarea {
         border-radius: 12px !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        border-radius: 12px !important;
+    }
+
+    /* Fix oversized widget bars by avoiding aggressive widget styling */
+    div[data-testid="stSlider"] {
+        padding-top: 0.1rem;
+        padding-bottom: 0.2rem;
+    }
+
+    div[data-testid="stSlider"] [role="slider"] {
+        box-shadow: none !important;
+    }
+
+    .small-muted {
+        color: #6b7280 !important;
+        font-size: 0.92rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# Friendly helper text
+# Friendly text
 # -------------------------------------------------
 def get_fun_greeting():
-    greetings = [
+    return random.choice([
         "Hi, welcome back.",
         "Hi, ready to build your plan?",
         "Hi, let’s put together something solid for you.",
         "Hi, let’s make fitness planning a little easier today."
-    ]
-    return random.choice(greetings)
+    ])
 
 
 def get_fun_joke():
-    jokes = [
+    return random.choice([
         "I promise this plan is more organized than most notes app workouts.",
         "No random Monday chest day chaos here.",
         "Built with less guessing and fewer chicken and broccoli stereotypes.",
         "Think of this as your gym buddy, just without stealing your bench.",
         "This app will not tell you to max out every day, so we are already ahead."
-    ]
-    return random.choice(jokes)
+    ])
 
 
 def get_goal_motivation(goal):
     if goal == "Lose fat":
         return "Small consistent wins matter more than trying to be perfect."
-    elif goal == "Build muscle":
+    if goal == "Build muscle":
         return "Eat, recover, train hard, repeat. Boring works."
-    elif goal == "Maintain weight":
+    if goal == "Maintain weight":
         return "Consistency is the whole game when the goal is maintenance."
     return "A balanced plan you can actually stick to usually beats an extreme one."
 
 
 def get_results_intro(name, goal):
     person = name.strip() if name.strip() else "there"
-
     intros = {
         "Lose fat": f"Nice, {person}. Here’s a plan focused on keeping things efficient while supporting fat loss.",
         "Build muscle": f"Nice, {person}. Here’s a plan focused on training quality, recovery, and muscle gain.",
         "Maintain weight": f"Nice, {person}. Here’s a balanced plan to help you stay consistent and maintain progress.",
-        "Improve general fitness": f"Nice, {person}. Here’s a balanced plan to help improve overall fitness without overcomplicating it."
+        "Improve general fitness": f"Nice, {person}. Here’s a balanced plan to improve overall fitness without making things complicated."
     }
     return intros.get(goal, f"Nice, {person}. Here’s your personalized plan.")
 
 
 # -------------------------------------------------
-# Helpers
+# Utility helpers
 # -------------------------------------------------
 def calculate_bmr(weight_lbs, height_ft, height_in, age, sex):
     weight_kg = weight_lbs * 0.453592
     total_inches = (height_ft * 12) + height_in
     height_cm = total_inches * 2.54
-
     if sex == "Male":
         return (10 * weight_kg) + (6.25 * height_cm) - (5 * age) + 5
     return (10 * weight_kg) + (6.25 * height_cm) - (5 * age) - 161
 
 
 def activity_multiplier(activity_level):
-    multipliers = {
+    return {
         "Sedentary (little or no exercise)": 1.2,
         "Lightly active (1-3 days/week)": 1.375,
         "Moderately active (3-5 days/week)": 1.55,
         "Very active (6-7 days/week)": 1.725,
         "Extremely active (hard exercise + physical job)": 1.9
-    }
-    return multipliers[activity_level]
+    }[activity_level]
 
 
 def workout_split(training_days):
     if training_days <= 2:
         return "Full Body Split"
-    elif training_days == 3:
+    if training_days == 3:
         return "Upper / Lower / Full Body Split"
-    elif training_days == 4:
+    if training_days == 4:
         return "Upper / Lower Split"
-    elif training_days == 5:
+    if training_days == 5:
         return "Push / Pull / Legs + Upper / Lower"
     return "Push / Pull / Legs Split"
 
@@ -265,9 +277,9 @@ def workout_split(training_days):
 def get_time_adjustment(workout_time):
     if workout_time == "20-30 minutes":
         return 4
-    elif workout_time == "30-45 minutes":
+    if workout_time == "30-45 minutes":
         return 5
-    elif workout_time == "45-60 minutes":
+    if workout_time == "45-60 minutes":
         return 6
     return 7
 
@@ -275,10 +287,10 @@ def get_time_adjustment(workout_time):
 def adjust_sets_by_experience(exercise_line, experience_level):
     if experience_level == "Beginner":
         return exercise_line.replace("4 x", "3 x").replace("3 x", "2 x")
-    elif experience_level == "Advanced":
+    if experience_level == "Advanced":
         if "2 x" in exercise_line:
             return exercise_line.replace("2 x", "3 x")
-        elif "3 x" in exercise_line:
+        if "3 x" in exercise_line:
             return exercise_line.replace("3 x", "4 x")
     return exercise_line
 
@@ -286,7 +298,6 @@ def adjust_sets_by_experience(exercise_line, experience_level):
 def detect_injury_keywords(injuries_text):
     text = injuries_text.lower().strip()
     found = []
-
     keyword_map = {
         "shoulder": ["shoulder", "rotator cuff", "impingement"],
         "knee": ["knee", "acl", "meniscus", "patellar"],
@@ -301,8 +312,54 @@ def detect_injury_keywords(injuries_text):
             if keyword in text:
                 found.append(injury_type)
                 break
-
     return found
+
+
+def substitute_exercise(exercise, injury_keywords):
+    lower = exercise.lower()
+
+    substitutions = {
+        "shoulder": {
+            "Seated Dumbbell Shoulder Press 3 x 8-10": "Cable Lateral Raise 3 x 12-15",
+            "Overhead Dumbbell Tricep Extension 3 x 10-12": "Rope Tricep Pushdown 3 x 10-12",
+            "Barbell Bench Press 3 x 8-10": "Machine Chest Press 3 x 10-12"
+        },
+        "knee": {
+            "Barbell Squat 3 x 6-8": "Box Squat 3 x 8-10",
+            "Walking Lunges 2 x 10 each leg": "Glute Bridge 3 x 12-15",
+            "Bulgarian Split Squat 3 x 8 each leg": "Leg Press 3 x 10"
+        },
+        "back": {
+            "Romanian Deadlift 3 x 8-10": "Hip Thrust 3 x 10-12",
+            "Dumbbell Romanian Deadlift 3 x 10": "Glute Bridge 3 x 12-15",
+            "Barbell Bench Press 3 x 8-10": "Machine Chest Press 3 x 10-12"
+        },
+        "wrist": {
+            "EZ Bar Curl 3 x 10-12": "Hammer Curl 3 x 10-12",
+            "Barbell Bench Press 3 x 8-10": "Neutral Grip Dumbbell Press 3 x 8-10"
+        },
+        "elbow": {
+            "Overhead Dumbbell Tricep Extension 3 x 10-12": "Rope Tricep Pushdown 3 x 10-12",
+            "EZ Bar Curl 3 x 10-12": "Machine Curl 3 x 10-12"
+        },
+        "ankle": {
+            "Walking Lunges 2 x 10 each leg": "Leg Curl 3 x 12",
+            "Reverse Lunge 2 x 10 each leg": "Leg Press 3 x 10"
+        }
+    }
+
+    for injury in injury_keywords:
+        if exercise in substitutions.get(injury, {}):
+            return substitutions[injury][exercise]
+
+    if "back" in injury_keywords and ("deadlift" in lower or "barbell row" in lower):
+        return None
+    if "shoulder" in injury_keywords and ("upright row" in lower or "dip" in lower or "overhead" in lower):
+        return None
+    if "knee" in injury_keywords and "jump" in lower:
+        return None
+
+    return exercise
 
 
 def get_injury_guidance(injury_keywords):
@@ -346,30 +403,12 @@ def get_injury_guidance(injury_keywords):
     return {"guidance": guidance, "avoid": avoid, "substitutes": substitutes}
 
 
-def filter_exercises_for_injuries(exercises, injury_keywords):
-    filtered = []
-
-    for ex in exercises:
-        name_lower = ex.lower()
-
-        if "shoulder" in injury_keywords and ("overhead" in name_lower or "upright row" in name_lower or "dip" in name_lower):
-            continue
-        if "knee" in injury_keywords and ("jump" in name_lower):
-            continue
-        if "back" in injury_keywords and ("deadlift" in name_lower or "barbell row" in name_lower):
-            continue
-
-        filtered.append(ex)
-
-    return filtered
-
-
 def goal_focus_text(goal):
     if goal == "Lose fat":
         return "This plan focuses on maintaining muscle, keeping training efficient, and supporting a calorie deficit."
-    elif goal == "Build muscle":
+    if goal == "Build muscle":
         return "This plan focuses on hypertrophy, quality training volume, and progressive overload."
-    elif goal == "Maintain weight":
+    if goal == "Maintain weight":
         return "This plan focuses on balanced training, strength maintenance, and consistency."
     return "This plan focuses on balanced fitness, movement quality, and general health."
 
@@ -474,10 +513,105 @@ def get_progression_rules(goal, experience_level):
 def get_day_labels(selected_days, training_days):
     ordered_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     actual_days = [day for day in ordered_days if day in selected_days]
-
     if len(actual_days) >= training_days:
         return actual_days[:training_days]
     return ordered_days[:training_days]
+
+
+def get_goal_timeline(goal, current_weight, target_weight):
+    if target_weight is None or target_weight <= 0:
+        return "No target weight was entered, so no timeline estimate was generated."
+
+    diff = abs(current_weight - target_weight)
+
+    if diff == 0:
+        return "You are already at your target weight based on the numbers entered."
+
+    if goal == "Lose fat":
+        low_weeks = math.ceil(diff / 1.5)
+        high_weeks = math.ceil(diff / 0.75)
+        return f"A realistic fat loss timeline is about {low_weeks} to {high_weeks} weeks at a moderate pace."
+    elif goal == "Build muscle":
+        low_weeks = math.ceil(diff / 0.5)
+        high_weeks = math.ceil(diff / 0.25)
+        return f"A realistic muscle gain timeline is about {low_weeks} to {high_weeks} weeks, since progress is usually slower."
+    else:
+        return "A timeline estimate matters less here, since the main focus is consistency and steady performance."
+
+
+def get_warmup_plan(goal, injury_keywords):
+    warmup = [
+        "5 minutes of light cardio to raise body temperature.",
+        "Dynamic mobility for the joints you are training that day.",
+        "1 to 2 lighter warm-up sets before your first main exercise."
+    ]
+
+    if "shoulder" in injury_keywords:
+        warmup.append("Add light band or cable shoulder activation before upper body sessions.")
+    if "knee" in injury_keywords:
+        warmup.append("Add gentle knee-friendly leg prep and controlled bodyweight squats before lower body work.")
+    if "back" in injury_keywords:
+        warmup.append("Add core bracing and hip hinge practice before loaded lower body movements.")
+
+    if goal == "Lose fat":
+        warmup.append("Keep the warm-up focused and efficient so you save energy for the workout.")
+    return warmup
+
+
+def get_core_plan(training_days):
+    if training_days <= 2:
+        return ["Plank 3 x 30-45 seconds", "Dead Bug 2 x 10 each side"]
+    elif training_days <= 4:
+        return ["Plank 3 x 30-45 seconds", "Hanging Knee Raise 3 x 10-12", "Cable Crunch 2 x 12-15"]
+    return ["Plank 3 x 45 seconds", "Cable Crunch 3 x 12-15", "Hanging Knee Raise 3 x 10-12"]
+
+
+def get_rest_guidance():
+    return [
+        "Main compound lifts: rest about 2 to 3 minutes between sets.",
+        "Accessory exercises: rest about 60 to 90 seconds between sets.",
+        "If recovery is poor, add a little more rest instead of rushing."
+    ]
+
+
+def get_checkin_adjustment(goal, weekly_weight_change, energy_level, hunger_level, recovery_level):
+    if weekly_weight_change is None:
+        return "No weekly check-in data was entered."
+
+    if goal == "Lose fat":
+        if weekly_weight_change > -0.25:
+            return "Fat loss is moving slowly. Consider lowering calories slightly or adding a small amount of cardio."
+        elif weekly_weight_change < -2.0 or energy_level <= 2 or recovery_level <= 2:
+            return "You may be pushing too hard. Consider increasing calories slightly or reducing cardio."
+        return "Your current fat loss pace looks reasonable. Keep calories and cardio the same for now."
+
+    if goal == "Build muscle":
+        if weekly_weight_change < 0.1:
+            return "Muscle gain may be moving slowly. Consider adding around 100 to 150 calories per day."
+        elif weekly_weight_change > 1.0 or hunger_level >= 4:
+            return "Weight is moving up quickly. Consider tightening calories slightly to limit excess fat gain."
+        return "Your muscle gain pace looks reasonable. Stay consistent."
+
+    if recovery_level <= 2:
+        return "Recovery looks low. Consider a lighter week, more sleep, or a small reduction in total volume."
+    return "Your check-in looks stable. Keep the plan the same and stay consistent."
+
+
+def get_why_plan_was_chosen(profile, injury_keywords):
+    reasons = [
+        f"This plan used your goal of {profile.goal.lower()} to choose calorie and training emphasis.",
+        f"It used your {profile.training_days} training days per week to choose a {workout_split(profile.training_days).lower()}.",
+        f"It used your equipment access of {profile.equipment.lower()} to choose realistic exercises.",
+        f"It used your experience level of {profile.experience_level.lower()} to adjust total training volume."
+    ]
+
+    if profile.preferred_focus != "No preference":
+        reasons.append(f"It also emphasized {profile.preferred_focus.lower()} because you selected that as a focus area.")
+
+    if injury_keywords:
+        reasons.append("It modified or substituted some exercises based on the injury keywords you entered.")
+
+    return reasons
 
 
 def build_workout_plan(training_days, equipment, workout_time, injury_keywords, experience_level, goal, preferred_focus, selected_days):
@@ -548,17 +682,17 @@ def build_workout_plan(training_days, equipment, workout_time, injury_keywords, 
     ]
 
     if equipment in ["Full gym", "Home gym"]:
-        push = filter_exercises_for_injuries(gym_push, injury_keywords)
-        pull = filter_exercises_for_injuries(gym_pull, injury_keywords)
-        legs = filter_exercises_for_injuries(gym_legs, injury_keywords)
+        push = gym_push
+        pull = gym_pull
+        legs = gym_legs
     elif equipment == "Dumbbells only":
-        push = filter_exercises_for_injuries(dumbbell_push, injury_keywords)
-        pull = filter_exercises_for_injuries(dumbbell_pull, injury_keywords)
-        legs = filter_exercises_for_injuries(dumbbell_legs, injury_keywords)
+        push = dumbbell_push
+        pull = dumbbell_pull
+        legs = dumbbell_legs
     else:
-        push = filter_exercises_for_injuries(bodyweight_full, injury_keywords)
-        pull = filter_exercises_for_injuries(bodyweight_full, injury_keywords)
-        legs = filter_exercises_for_injuries(bodyweight_full, injury_keywords)
+        push = bodyweight_full
+        pull = bodyweight_full
+        legs = bodyweight_full
 
     if goal == "Build muscle":
         max_exercises = min(max_exercises + 1, 7)
@@ -580,6 +714,18 @@ def build_workout_plan(training_days, equipment, workout_time, injury_keywords, 
     push = [adjust_sets_by_experience(ex, experience_level) for ex in push]
     pull = [adjust_sets_by_experience(ex, experience_level) for ex in pull]
     legs = [adjust_sets_by_experience(ex, experience_level) for ex in legs]
+
+    def injury_adjust(ex_list):
+        adjusted = []
+        for ex in ex_list:
+            new_ex = substitute_exercise(ex, injury_keywords)
+            if new_ex is not None:
+                adjusted.append(new_ex)
+        return adjusted
+
+    push = injury_adjust(push)
+    pull = injury_adjust(pull)
+    legs = injury_adjust(legs)
 
     workout_days = {}
     day_labels = get_day_labels(selected_days, training_days)
@@ -620,7 +766,7 @@ def build_workout_plan(training_days, equipment, workout_time, injury_keywords, 
 
 
 # -------------------------------------------------
-# Multi-agent classes
+# Data model and agents
 # -------------------------------------------------
 @dataclass
 class UserProfile:
@@ -642,6 +788,11 @@ class UserProfile:
     preferred_focus: str
     cardio_preference: str
     selected_days: list
+    target_weight: float
+    weekly_weight_change: float
+    energy_level: int
+    hunger_level: int
+    recovery_level: int
 
 
 class PlannerAgent:
@@ -682,12 +833,30 @@ class AnalysisAgent:
         protein_low = round(profile.weight_lbs * 0.7)
         protein_high = round(profile.weight_lbs * 1.0)
 
-        training_guidance = goal_focus_text(profile.goal)
+        timeline = get_goal_timeline(profile.goal, profile.weight_lbs, profile.target_weight)
         cardio_plan = get_cardio_plan(profile.goal, profile.activity_level, profile.cardio_preference)
+        nutrition_guidance = {
+            "No preference": "Choose mostly whole foods that match your calories and protein target.",
+            "High protein": "Build each meal around a strong lean protein source.",
+            "Vegetarian": "Use Greek yogurt, eggs, tofu, tempeh, beans, lentils, and shakes.",
+            "Low carb": "Prioritize protein, vegetables, and healthy fats while keeping carbs lower.",
+            "Budget-friendly": "Use oats, rice, potatoes, eggs, canned tuna, chicken, and frozen vegetables."
+        }.get(profile.diet, "Choose foods you can stay consistent with.")
+
         meal_guidance = get_meal_guidance(profile.diet, protein_low, protein_high, round(target_calories))
         recovery_guidance = get_recovery_guidance(profile.training_days, profile.goal)
         progression_rules = get_progression_rules(profile.goal, profile.experience_level)
         injury_info = get_injury_guidance(plan["injury_keywords"])
+        warmup_plan = get_warmup_plan(profile.goal, plan["injury_keywords"])
+        core_plan = get_core_plan(profile.training_days)
+        rest_guidance = get_rest_guidance()
+        checkin_adjustment = get_checkin_adjustment(
+            profile.goal,
+            profile.weekly_weight_change,
+            profile.energy_level,
+            profile.hunger_level,
+            profile.recovery_level
+        )
 
         detailed_workout = build_workout_plan(
             profile.training_days,
@@ -700,13 +869,7 @@ class AnalysisAgent:
             profile.selected_days
         )
 
-        nutrition_guidance = {
-            "No preference": "Choose mostly whole foods that match your calories and protein target.",
-            "High protein": "Build each meal around a strong lean protein source.",
-            "Vegetarian": "Use Greek yogurt, eggs, tofu, tempeh, beans, lentils, and shakes.",
-            "Low carb": "Prioritize protein, vegetables, and healthy fats while keeping carbs lower.",
-            "Budget-friendly": "Use oats, rice, potatoes, eggs, canned tuna, chicken, and frozen vegetables."
-        }.get(profile.diet, "Choose foods you can stay consistent with.")
+        why_plan = get_why_plan_was_chosen(profile, plan["injury_keywords"])
 
         return {
             "agent": "AnalysisAgent",
@@ -718,13 +881,19 @@ class AnalysisAgent:
             "protein_low": protein_low,
             "protein_high": protein_high,
             "workout_split": workout_split(profile.training_days),
-            "training_guidance": training_guidance,
-            "nutrition_guidance": nutrition_guidance,
+            "training_guidance": goal_focus_text(profile.goal),
+            "timeline": timeline,
             "cardio_plan": cardio_plan,
+            "nutrition_guidance": nutrition_guidance,
             "meal_guidance": meal_guidance,
             "recovery_guidance": recovery_guidance,
             "progression_rules": progression_rules,
             "injury_info": injury_info,
+            "warmup_plan": warmup_plan,
+            "core_plan": core_plan,
+            "rest_guidance": rest_guidance,
+            "checkin_adjustment": checkin_adjustment,
+            "why_plan": why_plan,
             "detailed_workout": detailed_workout
         }
 
@@ -740,6 +909,12 @@ class VerifierAgent:
         if "high_training_frequency" in plan["risk_flags"]:
             warnings.append("High weekly training frequency means recovery, sleep, and exercise quality need close attention.")
 
+        confidence = "High"
+        if plan["injury_keywords"] or profile.equipment == "Bodyweight only":
+            confidence = "Moderate"
+        if profile.training_days >= 6 and plan["injury_keywords"]:
+            confidence = "Moderate to Lower"
+
         final_summary = (
             f"Estimated BMR: {analysis['bmr']} calories/day. "
             f"Estimated TDEE: {analysis['tdee']} calories/day. "
@@ -751,6 +926,7 @@ class VerifierAgent:
             "agent": "VerifierAgent",
             "status": "completed",
             "warnings": warnings,
+            "confidence": confidence,
             "final_summary": final_summary
         }
 
@@ -786,6 +962,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
+# Sidebar quick summary
+# -------------------------------------------------
+with st.sidebar:
+    st.markdown("## Quick Summary")
+    st.markdown('<div class="sidebar-box">Use this app to build a workout, calorie, cardio, recovery, and nutrition plan.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-box"><span class="small-muted">Tip: if a movement hurts, treat the plan like a starting point and swap the exercise.</span></div>', unsafe_allow_html=True)
+
+# -------------------------------------------------
 # Form
 # -------------------------------------------------
 with st.form("fitness_form"):
@@ -800,11 +985,13 @@ with st.form("fitness_form"):
 
         st.subheader("📏 Body Information")
         weight_lbs = st.number_input("Weight (lbs)", min_value=80.0, max_value=500.0, value=180.0, step=1.0)
-        h1, h2 = st.columns(2)
-        with h1:
+        col_h1, col_h2 = st.columns(2)
+        with col_h1:
             height_ft = st.number_input("Height - Feet", min_value=3, max_value=8, value=6, step=1)
-        with h2:
+        with col_h2:
             height_in = st.number_input("Height - Inches", min_value=0, max_value=11, value=0, step=1)
+
+        target_weight = st.number_input("Target Weight (optional)", min_value=0.0, max_value=500.0, value=0.0, step=1.0)
         st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
@@ -828,6 +1015,14 @@ with st.form("fitness_form"):
             "Time Available Per Workout",
             ["20-30 minutes", "30-45 minutes", "45-60 minutes", "60+ minutes"]
         )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.subheader("📈 Weekly Check-In")
+        weekly_weight_change = st.number_input("Weekly weight change in lbs (negative for loss)", value=0.0, step=0.1)
+        energy_level = st.slider("Energy level", 1, 5, 3)
+        hunger_level = st.slider("Hunger level", 1, 5, 3)
+        recovery_level = st.slider("Recovery level", 1, 5, 3)
         st.markdown('</div>', unsafe_allow_html=True)
 
     with right:
@@ -870,11 +1065,12 @@ with st.form("fitness_form"):
 
     submitted = st.form_submit_button("Generate My Plan")
 
-
 # -------------------------------------------------
 # Results
 # -------------------------------------------------
 if submitted:
+    target_weight_value = None if target_weight == 0 else float(target_weight)
+
     profile = UserProfile(
         name=name,
         age=int(age),
@@ -893,7 +1089,12 @@ if submitted:
         experience_level=experience_level,
         preferred_focus=preferred_focus,
         cardio_preference=cardio_preference,
-        selected_days=selected_days
+        selected_days=selected_days,
+        target_weight=target_weight_value if target_weight_value else 0.0,
+        weekly_weight_change=float(weekly_weight_change),
+        energy_level=int(energy_level),
+        hunger_level=int(hunger_level),
+        recovery_level=int(recovery_level)
     )
 
     controller = ControllerAgent()
@@ -903,17 +1104,12 @@ if submitted:
     analysis = result["analysis"]
     verification = result["verification"]
 
-    st.markdown("---")
-
-    display_name = name.strip() if name.strip() else "User"
     intro_text = get_results_intro(name, goal)
     motivation_text = get_goal_motivation(goal)
+    display_name = name.strip() if name.strip() else "User"
 
-    st.markdown(f"""
-    <div class="result-intro">
-        {intro_text} {motivation_text}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown(f'<div class="result-intro">{intro_text} {motivation_text}</div>', unsafe_allow_html=True)
 
     st.markdown(f"""
     <div class="section-card">
@@ -924,6 +1120,7 @@ if submitted:
         <span class="pill">Experience: {experience_level}</span>
         <span class="pill">Equipment: {equipment}</span>
         <span class="pill">Focus: {preferred_focus}</span>
+        <span class="pill">Plan Confidence: {verification['confidence']}</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -941,12 +1138,15 @@ if submitted:
     st.caption(analysis["calorie_note"])
     st.markdown('</div>', unsafe_allow_html=True)
 
-    left_col, right_col = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with left_col:
+    with col1:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader("🏋️ Training Focus")
         st.write(analysis["training_guidance"])
+
+        st.subheader("⏳ Goal Timeline Estimate")
+        st.write(analysis["timeline"])
 
         st.subheader("❤️ Cardio Recommendation")
         st.write(analysis["cardio_plan"])
@@ -956,7 +1156,7 @@ if submitted:
             st.write(f"• {rule}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with right_col:
+    with col2:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader("🍽️ Nutrition and Meals")
         st.write(analysis["nutrition_guidance"])
@@ -967,7 +1167,21 @@ if submitted:
         st.subheader("💤 Recovery Guidance")
         for item in analysis["recovery_guidance"]:
             st.write(f"• {item}")
+
+        st.subheader("🕒 Rest Guidance")
+        for item in analysis["rest_guidance"]:
+            st.write(f"• {item}")
         st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("🔥 Warm-Up Plan")
+    for item in analysis["warmup_plan"]:
+        st.write(f"• {item}")
+
+    st.subheader("🧱 Core Work")
+    for item in analysis["core_plan"]:
+        st.write(f"• {item}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("🗓️ Detailed Workout Plan")
@@ -992,6 +1206,15 @@ if submitted:
         st.markdown("**Potential Better Substitutes**")
         for item in analysis["injury_info"]["substitutes"]:
             st.write(f"• {item}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("📍 Weekly Progress Check-In Recommendation")
+    st.write(analysis["checkin_adjustment"])
+
+    st.subheader("🧠 Why This Plan Was Chosen")
+    for item in analysis["why_plan"]:
+        st.write(f"• {item}")
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown(f"""
@@ -1025,7 +1248,5 @@ if submitted:
         st.markdown("**Verifier Agent Output**")
         st.json(verification)
 
-    st.markdown(
-        '<div class="footer-note">This tool provides general wellness guidance only and is not medical advice.</div>',
-        unsafe_allow_html=True
+    st.markdown('<div class="footer-note">This tool provides general wellness guidance only and is not medical advice.</div>', unsafe_allow_html=True)
     )
