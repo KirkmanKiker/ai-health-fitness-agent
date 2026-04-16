@@ -1,10 +1,11 @@
-import streamlit as st
-from dataclasses import dataclass
-import random
 import math
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import os
+import random
+from dataclasses import dataclass
+
+import streamlit as st
+from google import genai
+
 
 # -------------------------------------------------
 # Page setup
@@ -16,7 +17,7 @@ st.set_page_config(
 )
 
 # -------------------------------------------------
-# Clean CSS
+# Clean UI styling
 # -------------------------------------------------
 st.markdown("""
 <style>
@@ -199,6 +200,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 # -------------------------------------------------
 # Friendly text
 # -------------------------------------------------
@@ -240,6 +242,78 @@ def get_results_intro(name, goal):
         "Improve general fitness": f"Nice, {person}. Here’s a balanced plan to improve overall fitness without making things complicated."
     }
     return intros.get(goal, f"Nice, {person}. Here’s your personalized plan.")
+
+
+# -------------------------------------------------
+# Gemini integration
+# -------------------------------------------------
+def get_gemini_client():
+    api_key = None
+
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        api_key = os.getenv("GEMINI_API_KEY")
+
+    if not api_key:
+        return None
+
+    return genai.Client(api_key=api_key)
+
+
+def build_gemini_prompt(profile, analysis, verification):
+    workout_text = ""
+    for day, exercises in analysis["detailed_workout"].items():
+        workout_text += f"{day}\n"
+        for ex in exercises:
+            workout_text += f"- {ex}\n"
+        workout_text += "\n"
+
+    return f"""
+You are improving a fitness app output.
+
+Rewrite this plan so it sounds natural, human, and realistic.
+Keep it simple and clear.
+Do not change calories, protein, or exercises.
+If injuries exist, add a small safety note.
+End with one short motivating sentence.
+
+User:
+Name: {profile.name if profile.name.strip() else "User"}
+Goal: {profile.goal}
+Experience: {profile.experience_level}
+Equipment: {profile.equipment}
+Injuries: {profile.injuries if profile.injuries.strip() else "None"}
+
+Plan:
+Calories: {analysis["target_calories"]}
+Protein: {analysis["protein_low"]} to {analysis["protein_high"]} grams
+Cardio: {analysis["cardio_plan"]}
+Nutrition: {analysis["nutrition_guidance"]}
+
+Workout Plan:
+{workout_text}
+
+Summary:
+{verification["final_summary"]}
+""".strip()
+
+
+def generate_gemini_summary(profile, analysis, verification):
+    client = get_gemini_client()
+    if client is None:
+        return None
+
+    prompt = build_gemini_prompt(profile, analysis, verification)
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        return f"Gemini error: {e}"
 
 
 # -------------------------------------------------
@@ -402,7 +476,11 @@ def get_injury_guidance(injury_keywords):
     if not guidance:
         guidance.append("No major injury keywords were detected. Train with good form, gradual progression, and proper recovery.")
 
-    return {"guidance": guidance, "avoid": avoid, "substitutes": substitutes}
+    return {
+        "guidance": guidance,
+        "avoid": avoid,
+        "substitutes": substitutes
+    }
 
 
 def goal_focus_text(goal):
@@ -436,7 +514,12 @@ def get_cardio_plan(goal, activity_level, cardio_preference):
     else:
         mode = "Best option: walking, bike, treadmill, or another low stress cardio option."
 
-    extra = "Start on the lower end and build up gradually." if activity_level == "Sedentary (little or no exercise)" else "Keep the intensity moderate so it supports recovery."
+    extra = (
+        "Start on the lower end and build up gradually."
+        if activity_level == "Sedentary (little or no exercise)"
+        else "Keep the intensity moderate so it supports recovery."
+    )
+
     return f"{base} {mode} {extra}"
 
 
@@ -557,6 +640,7 @@ def get_warmup_plan(goal, injury_keywords):
 
     if goal == "Lose fat":
         warmup.append("Keep the warm-up focused and efficient so you save energy for the workout.")
+
     return warmup
 
 
@@ -764,90 +848,6 @@ def build_workout_plan(training_days, equipment, workout_time, injury_keywords, 
     return workout_days
 
 
-def build_email_summary(profile, analysis, verification):
-    workout_text = ""
-    for day, exercises in analysis["detailed_workout"].items():
-        workout_text += f"{day}\n"
-        for ex in exercises:
-            workout_text += f"  - {ex}\n"
-        workout_text += "\n"
-
-    recovery_lines = "\n".join([f"- {item}" for item in analysis["recovery_guidance"]])
-    progression_lines = "\n".join([f"- {item}" for item in analysis["progression_rules"]])
-    warmup_lines = "\n".join([f"- {item}" for item in analysis["warmup_plan"]])
-    core_lines = "\n".join([f"- {item}" for item in analysis["core_plan"]])
-
-    name_text = profile.name if profile.name.strip() else "User"
-
-    body = f"""Hi {name_text},
-
-Knock knock, have you done your workout today?
-
-Here is your AI Health & Fitness Plan.
-
-Goal: {profile.goal}
-Workout Split: {analysis["workout_split"]}
-Training Days: {profile.training_days}
-Equipment: {profile.equipment}
-Experience Level: {profile.experience_level}
-
-Calories
-- BMR: {analysis["bmr"]} calories/day
-- TDEE: {analysis["tdee"]} calories/day
-- Target Calories: {analysis["target_calories"]} calories/day
-
-Protein
-- {analysis["protein_low"]} to {analysis["protein_high"]} grams/day
-
-Cardio
-- {analysis["cardio_plan"]}
-
-Nutrition
-- {analysis["nutrition_guidance"]}
-- Meal Structure: {analysis["meal_guidance"]["meals_per_day"]}
-- Protein Target: {analysis["meal_guidance"]["protein_target"]}
-- Food Examples: {analysis["meal_guidance"]["food_examples"]}
-
-Warm-Up
-{warmup_lines}
-
-Core Work
-{core_lines}
-
-Workout Plan
-{workout_text}
-Recovery Guidance
-{recovery_lines}
-
-Progression Rules
-{progression_lines}
-
-Final Summary
-{verification["final_summary"]}
-
-This plan provides general wellness guidance only and is not medical advice.
-
-Your friendly fitness planner
-"""
-    return body
-
-
-def send_email_results(receiver_email, subject, body):
-    sender_email = st.secrets["SENDER_EMAIL"]
-    sender_password = st.secrets["SENDER_APP_PASSWORD"]
-
-    msg = MIMEMultipart()
-    msg["From"] = sender_email
-    msg["To"] = receiver_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, receiver_email, msg.as_string())
-
-
 # -------------------------------------------------
 # Data model and agents
 # -------------------------------------------------
@@ -1024,7 +1024,11 @@ class ControllerAgent:
         plan = self.planner.run(profile)
         analysis = self.analyzer.run(profile, plan)
         verification = self.verifier.run(profile, plan, analysis)
-        return {"plan": plan, "analysis": analysis, "verification": verification}
+        return {
+            "plan": plan,
+            "analysis": analysis,
+            "verification": verification
+        }
 
 
 # -------------------------------------------------
@@ -1044,14 +1048,25 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+
 # -------------------------------------------------
 # Sidebar
 # -------------------------------------------------
 with st.sidebar:
     st.markdown("## Quick Summary")
-    st.markdown('<div class="sidebar-box">Use this app to build a workout, calorie, cardio, recovery, and nutrition plan.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate<br>Email your plan</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-box"><span class="small-muted">Tip: if a movement hurts, treat the plan like a starting point and swap the exercise.</span></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="sidebar-box">Use this app to build a workout, calorie, cardio, recovery, and nutrition plan.</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate<br>Gemini enhanced summary</div>',
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        '<div class="sidebar-box"><span class="small-muted">Tip: if a movement hurts, treat the plan like a starting point and swap the exercise.</span></div>',
+        unsafe_allow_html=True
+    )
+
 
 # -------------------------------------------------
 # Form
@@ -1148,6 +1163,7 @@ with st.form("fitness_form"):
 
     submitted = st.form_submit_button("Generate My Plan")
 
+
 # -------------------------------------------------
 # Results
 # -------------------------------------------------
@@ -1186,13 +1202,17 @@ if submitted:
     plan = result["plan"]
     analysis = result["analysis"]
     verification = result["verification"]
+    gemini_summary = generate_gemini_summary(profile, analysis, verification)
 
     intro_text = get_results_intro(name, goal)
     motivation_text = get_goal_motivation(goal)
     display_name = name.strip() if name.strip() else "User"
 
     st.markdown("---")
-    st.markdown(f'<div class="result-intro">{intro_text} {motivation_text}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="result-intro">{intro_text} {motivation_text}</div>',
+        unsafe_allow_html=True
+    )
 
     st.markdown(f"""
     <div class="section-card">
@@ -1220,6 +1240,12 @@ if submitted:
         st.metric("Protein", f"{analysis['protein_low']}–{analysis['protein_high']}g")
     st.caption(analysis["calorie_note"])
     st.markdown('</div>', unsafe_allow_html=True)
+
+    if gemini_summary:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.subheader("✨ Gemini Enhanced Summary")
+        st.write(gemini_summary)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
 
@@ -1269,7 +1295,10 @@ if submitted:
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.subheader("🗓️ Detailed Workout Plan")
     for day, exercises in analysis["detailed_workout"].items():
-        st.markdown(f'<div class="workout-day"><div class="workout-day-title">{day}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="workout-day"><div class="workout-day-title">{day}</div>',
+            unsafe_allow_html=True
+        )
         for ex in exercises:
             st.markdown(f'<div class="exercise-item">{ex}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1310,40 +1339,6 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.subheader("📧 Email Your Plan")
-
-    st.write("To use this on Streamlit Cloud, add these secrets:")
-    st.code(
-        'SENDER_EMAIL = "youremail@gmail.com"\nSENDER_APP_PASSWORD = "your_gmail_app_password"',
-        language="toml"
-    )
-
-    receiver_email = st.text_input("Send results to this email")
-    email_body = build_email_summary(profile, analysis, verification)
-
-    st.download_button(
-        label="Download Email Preview",
-        data=email_body,
-        file_name="fitness_plan_email.txt",
-        mime="text/plain"
-    )
-
-    if st.button("Send Email"):
-        if not receiver_email:
-            st.warning("Please enter an email address.")
-        else:
-            try:
-                send_email_results(
-                    receiver_email=receiver_email,
-                    subject="Your AI Fitness Plan",
-                    body=email_body
-                )
-                st.success("Your fitness plan email was sent successfully.")
-            except Exception as e:
-                st.error(f"Email failed to send: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
-
     if verification["warnings"]:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader("⚠️ Recovery and Safety")
@@ -1369,4 +1364,3 @@ if submitted:
         '<div class="footer-note">This tool provides general wellness guidance only and is not medical advice.</div>',
         unsafe_allow_html=True
     )
-    
