@@ -2,6 +2,9 @@ import streamlit as st
 from dataclasses import dataclass
 import random
 import math
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # -------------------------------------------------
 # Page setup
@@ -162,7 +165,7 @@ st.markdown("""
         font-weight: 800;
     }
 
-    .stButton > button, .stFormSubmitButton > button {
+    .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
         background: linear-gradient(135deg, #1d4ed8, #3b82f6);
         color: white;
         border: none;
@@ -180,7 +183,6 @@ st.markdown("""
         border-radius: 12px !important;
     }
 
-    /* Fix oversized widget bars by avoiding aggressive widget styling */
     div[data-testid="stSlider"] {
         padding-top: 0.1rem;
         padding-bottom: 0.2rem;
@@ -575,9 +577,6 @@ def get_rest_guidance():
 
 
 def get_checkin_adjustment(goal, weekly_weight_change, energy_level, hunger_level, recovery_level):
-    if weekly_weight_change is None:
-        return "No weekly check-in data was entered."
-
     if goal == "Lose fat":
         if weekly_weight_change > -0.25:
             return "Fat loss is moving slowly. Consider lowering calories slightly or adding a small amount of cardio."
@@ -763,6 +762,90 @@ def build_workout_plan(training_days, equipment, workout_time, injury_keywords, 
         workout_days[f"{day_labels[5]} - Legs"] = legs[:max_exercises]
 
     return workout_days
+
+
+def build_email_summary(profile, analysis, verification):
+    workout_text = ""
+    for day, exercises in analysis["detailed_workout"].items():
+        workout_text += f"{day}\n"
+        for ex in exercises:
+            workout_text += f"  - {ex}\n"
+        workout_text += "\n"
+
+    recovery_lines = "\n".join([f"- {item}" for item in analysis["recovery_guidance"]])
+    progression_lines = "\n".join([f"- {item}" for item in analysis["progression_rules"]])
+    warmup_lines = "\n".join([f"- {item}" for item in analysis["warmup_plan"]])
+    core_lines = "\n".join([f"- {item}" for item in analysis["core_plan"]])
+
+    name_text = profile.name if profile.name.strip() else "User"
+
+    body = f"""Hi {name_text},
+
+Knock knock, have you done your workout today?
+
+Here is your AI Health & Fitness Plan.
+
+Goal: {profile.goal}
+Workout Split: {analysis["workout_split"]}
+Training Days: {profile.training_days}
+Equipment: {profile.equipment}
+Experience Level: {profile.experience_level}
+
+Calories
+- BMR: {analysis["bmr"]} calories/day
+- TDEE: {analysis["tdee"]} calories/day
+- Target Calories: {analysis["target_calories"]} calories/day
+
+Protein
+- {analysis["protein_low"]} to {analysis["protein_high"]} grams/day
+
+Cardio
+- {analysis["cardio_plan"]}
+
+Nutrition
+- {analysis["nutrition_guidance"]}
+- Meal Structure: {analysis["meal_guidance"]["meals_per_day"]}
+- Protein Target: {analysis["meal_guidance"]["protein_target"]}
+- Food Examples: {analysis["meal_guidance"]["food_examples"]}
+
+Warm-Up
+{warmup_lines}
+
+Core Work
+{core_lines}
+
+Workout Plan
+{workout_text}
+Recovery Guidance
+{recovery_lines}
+
+Progression Rules
+{progression_lines}
+
+Final Summary
+{verification["final_summary"]}
+
+This plan provides general wellness guidance only and is not medical advice.
+
+Your friendly fitness planner
+"""
+    return body
+
+
+def send_email_results(receiver_email, subject, body):
+    sender_email = st.secrets["SENDER_EMAIL"]
+    sender_password = st.secrets["SENDER_APP_PASSWORD"]
+
+    msg = MIMEMultipart()
+    msg["From"] = sender_email
+    msg["To"] = receiver_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, receiver_email, msg.as_string())
 
 
 # -------------------------------------------------
@@ -962,12 +1045,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# Sidebar quick summary
+# Sidebar
 # -------------------------------------------------
 with st.sidebar:
     st.markdown("## Quick Summary")
     st.markdown('<div class="sidebar-box">Use this app to build a workout, calorie, cardio, recovery, and nutrition plan.</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate<br>Email your plan</div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-box"><span class="small-muted">Tip: if a movement hurts, treat the plan like a starting point and swap the exercise.</span></div>', unsafe_allow_html=True)
 
 # -------------------------------------------------
@@ -1227,6 +1310,40 @@ if submitted:
     </div>
     """, unsafe_allow_html=True)
 
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("📧 Email Your Plan")
+
+    st.write("To use this on Streamlit Cloud, add these secrets:")
+    st.code(
+        'SENDER_EMAIL = "youremail@gmail.com"\nSENDER_APP_PASSWORD = "your_gmail_app_password"',
+        language="toml"
+    )
+
+    receiver_email = st.text_input("Send results to this email")
+    email_body = build_email_summary(profile, analysis, verification)
+
+    st.download_button(
+        label="Download Email Preview",
+        data=email_body,
+        file_name="fitness_plan_email.txt",
+        mime="text/plain"
+    )
+
+    if st.button("Send Email"):
+        if not receiver_email:
+            st.warning("Please enter an email address.")
+        else:
+            try:
+                send_email_results(
+                    receiver_email=receiver_email,
+                    subject="Your AI Fitness Plan",
+                    body=email_body
+                )
+                st.success("Your fitness plan email was sent successfully.")
+            except Exception as e:
+                st.error(f"Email failed to send: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
+
     if verification["warnings"]:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         st.subheader("⚠️ Recovery and Safety")
@@ -1248,5 +1365,8 @@ if submitted:
         st.markdown("**Verifier Agent Output**")
         st.json(verification)
 
-    st.markdown('<div class="footer-note">This tool provides general wellness guidance only and is not medical advice.</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="footer-note">This tool provides general wellness guidance only and is not medical advice.</div>',
+        unsafe_allow_html=True
+    )
     
