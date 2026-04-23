@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass
 
 import streamlit as st
+from openai import OpenAI
 
 
 # -------------------------------------------------
@@ -244,31 +245,26 @@ def get_results_intro(name, goal):
 
 
 # -------------------------------------------------
-# Gemini integration
+# OpenAI integration
 # -------------------------------------------------
-def get_gemini_client():
+def get_openai_client():
     api_key = None
 
     try:
-        api_key = st.secrets["GEMINI_API_KEY"]
+        api_key = st.secrets["OPENAI_API_KEY"]
     except Exception:
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = os.getenv("OPENAI_API_KEY")
 
     if not api_key:
         return None
 
     try:
-        from google.genai import Client
-    except ImportError:
-        return "IMPORT_ERROR"
-
-    try:
-        return Client(api_key=api_key)
+        return OpenAI(api_key=api_key)
     except Exception:
         return None
 
 
-def build_gemini_prompt(profile, analysis, verification):
+def build_openai_prompt(profile, analysis, verification):
     workout_text = ""
     for day, exercises in analysis["detailed_workout"].items():
         workout_text += f"{day}\n"
@@ -306,25 +302,22 @@ Summary:
 """.strip()
 
 
-def generate_gemini_summary(profile, analysis, verification):
-    client = get_gemini_client()
+def generate_openai_summary(profile, analysis, verification):
+    client = get_openai_client()
 
     if client is None:
         return None
 
-    if client == "IMPORT_ERROR":
-        return "Gemini is enabled in the code, but Streamlit Cloud could not import the Google Gen AI package."
-
-    prompt = build_gemini_prompt(profile, analysis, verification)
+    prompt = build_openai_prompt(profile, analysis, verification)
 
     try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
+        response = client.responses.create(
+            model="gpt-5.4",
+            input=prompt
         )
-        return response.text
+        return response.output_text
     except Exception as e:
-        return f"Gemini error: {e}"
+        return f"OpenAI error: {e}"
 
 
 # -------------------------------------------------
@@ -409,25 +402,49 @@ def substitute_exercise(exercise, injury_keywords):
         "shoulder": {
             "Seated Dumbbell Shoulder Press 3 x 8-10": "Cable Lateral Raise 3 x 12-15",
             "Overhead Dumbbell Tricep Extension 3 x 10-12": "Rope Tricep Pushdown 3 x 10-12",
-            "Barbell Bench Press 3 x 8-10": "Machine Chest Press 3 x 10-12"
+            "Barbell Bench Press 3 x 8-10": "Machine Chest Press 3 x 10-12",
+            "Seated Dumbbell Shoulder Press 2 x 8-10": "Cable Lateral Raise 2 x 12-15",
+            "Overhead Dumbbell Tricep Extension 2 x 10-12": "Rope Tricep Pushdown 2 x 10-12",
+            "Barbell Bench Press 2 x 8-10": "Machine Chest Press 2 x 10-12",
+            "Seated Dumbbell Shoulder Press 4 x 8-10": "Cable Lateral Raise 4 x 12-15",
+            "Overhead Dumbbell Tricep Extension 4 x 10-12": "Rope Tricep Pushdown 4 x 10-12",
+            "Barbell Bench Press 4 x 8-10": "Machine Chest Press 4 x 10-12"
         },
         "knee": {
             "Barbell Squat 3 x 6-8": "Box Squat 3 x 8-10",
             "Walking Lunges 2 x 10 each leg": "Glute Bridge 3 x 12-15",
-            "Bulgarian Split Squat 3 x 8 each leg": "Leg Press 3 x 10"
+            "Bulgarian Split Squat 3 x 8 each leg": "Leg Press 3 x 10",
+            "Barbell Squat 2 x 6-8": "Box Squat 2 x 8-10",
+            "Bulgarian Split Squat 2 x 8 each leg": "Leg Press 2 x 10",
+            "Barbell Squat 4 x 6-8": "Box Squat 4 x 8-10",
+            "Bulgarian Split Squat 4 x 8 each leg": "Leg Press 4 x 10"
         },
         "back": {
             "Romanian Deadlift 3 x 8-10": "Hip Thrust 3 x 10-12",
             "Dumbbell Romanian Deadlift 3 x 10": "Glute Bridge 3 x 12-15",
-            "Barbell Bench Press 3 x 8-10": "Machine Chest Press 3 x 10-12"
+            "Barbell Bench Press 3 x 8-10": "Machine Chest Press 3 x 10-12",
+            "Romanian Deadlift 2 x 8-10": "Hip Thrust 2 x 10-12",
+            "Dumbbell Romanian Deadlift 2 x 10": "Glute Bridge 2 x 12-15",
+            "Barbell Bench Press 2 x 8-10": "Machine Chest Press 2 x 10-12",
+            "Romanian Deadlift 4 x 8-10": "Hip Thrust 4 x 10-12",
+            "Dumbbell Romanian Deadlift 4 x 10": "Glute Bridge 4 x 12-15",
+            "Barbell Bench Press 4 x 8-10": "Machine Chest Press 4 x 10-12"
         },
         "wrist": {
             "EZ Bar Curl 3 x 10-12": "Hammer Curl 3 x 10-12",
-            "Barbell Bench Press 3 x 8-10": "Neutral Grip Dumbbell Press 3 x 8-10"
+            "Barbell Bench Press 3 x 8-10": "Neutral Grip Dumbbell Press 3 x 8-10",
+            "EZ Bar Curl 2 x 10-12": "Hammer Curl 2 x 10-12",
+            "Barbell Bench Press 2 x 8-10": "Neutral Grip Dumbbell Press 2 x 8-10",
+            "EZ Bar Curl 4 x 10-12": "Hammer Curl 4 x 10-12",
+            "Barbell Bench Press 4 x 8-10": "Neutral Grip Dumbbell Press 4 x 8-10"
         },
         "elbow": {
             "Overhead Dumbbell Tricep Extension 3 x 10-12": "Rope Tricep Pushdown 3 x 10-12",
-            "EZ Bar Curl 3 x 10-12": "Machine Curl 3 x 10-12"
+            "EZ Bar Curl 3 x 10-12": "Machine Curl 3 x 10-12",
+            "Overhead Dumbbell Tricep Extension 2 x 10-12": "Rope Tricep Pushdown 2 x 10-12",
+            "EZ Bar Curl 2 x 10-12": "Machine Curl 2 x 10-12",
+            "Overhead Dumbbell Tricep Extension 4 x 10-12": "Rope Tricep Pushdown 4 x 10-12",
+            "EZ Bar Curl 4 x 10-12": "Machine Curl 4 x 10-12"
         },
         "ankle": {
             "Walking Lunges 2 x 10 each leg": "Leg Curl 3 x 12",
@@ -1070,7 +1087,7 @@ with st.sidebar:
         unsafe_allow_html=True
     )
     st.markdown(
-        '<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate<br>Gemini enhanced summary</div>',
+        '<div class="sidebar-box"><strong>Best features</strong><br>Detailed workouts<br>Injury-aware substitutions<br>Weekly check-in advice<br>Goal timeline estimate<br>ChatGPT enhanced summary</div>',
         unsafe_allow_html=True
     )
     st.markdown(
@@ -1213,7 +1230,7 @@ if submitted:
     plan = result["plan"]
     analysis = result["analysis"]
     verification = result["verification"]
-    gemini_summary = generate_gemini_summary(profile, analysis, verification)
+    openai_summary = generate_openai_summary(profile, analysis, verification)
 
     intro_text = get_results_intro(name, goal)
     motivation_text = get_goal_motivation(goal)
@@ -1252,10 +1269,10 @@ if submitted:
     st.caption(analysis["calorie_note"])
     st.markdown('</div>', unsafe_allow_html=True)
 
-    if gemini_summary:
+    if openai_summary:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.subheader("✨ Gemini Enhanced Summary")
-        st.write(gemini_summary)
+        st.subheader("✨ ChatGPT Enhanced Summary")
+        st.write(openai_summary)
         st.markdown('</div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
